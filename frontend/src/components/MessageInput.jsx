@@ -36,10 +36,11 @@ const MessageInput = ({ onSendMessage, isLoading = false }) => {
           disabled={isLoading}
         />
         <Button
-          type="submit"
-          size="icon"
-          className="h-10 w-10 rounded-full"
-          disabled={!message.trim() || isLoading}
+          type="custom"
+          size="lg"
+          className="huppercase tracking-wide"
+            Fancy Button
+        disabled={!message.trim() || isLoading}
         >
           <Send className="h-5 w-5" />
         </Button>

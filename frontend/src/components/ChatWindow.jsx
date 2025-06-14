@@ -1,4 +1,3 @@
-// components/ChatWindow.jsx
 import React, { useState, useEffect, useRef } from "react";
 import ConversationList from "./ConversationList";
 import MessageList from "./MessageList";
@@ -23,19 +22,35 @@ const ChatWindow = () => {
   ]);
   const [activeConversationId, setActiveConversationId] = useState("1");
   const [isLoading, setIsLoading] = useState(false);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+  const chatContainerRef = useRef(null);
 
   const activeConversation = conversations.find(
     (c) => c.id === activeConversationId
   );
 
-  const chatContainerRef = useRef(null);
-
-  // Scroll to bottom on messages change
+  // Scroll to bottom on new messages
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+      setShowScrollButton(false);
     }
   }, [activeConversation?.messages]);
+
+  // Show scroll-to-bottom button if user scrolls up
+  const onScroll = () => {
+    const el = chatContainerRef.current;
+    if (!el) return;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+    setShowScrollButton(!nearBottom);
+  };
+
+  const scrollToBottom = () => {
+    const el = chatContainerRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    setShowScrollButton(false);
+  };
 
   // New conversation creation
   const onNewConversation = () => {
@@ -73,7 +88,6 @@ const ChatWindow = () => {
       timestamp: new Date(),
     };
 
-    // Append user message
     setConversations((prev) =>
       prev.map((c) =>
         c.id === activeConversationId
@@ -125,13 +139,35 @@ const ChatWindow = () => {
         onDeleteConversation={onDeleteConversation}
       />
       <div className="flex flex-col flex-1 bg-white">
+        {/* Fixed header */}
+        <header className="border-b p-4 font-semibold text-lg sticky top-0 bg-white z-10">
+          {activeConversation?.title || "Select a conversation"}
+        </header>
+
+        {/* Chat container with scroll listener */}
         <div
           ref={chatContainerRef}
-          className="flex flex-col overflow-y-auto p-4"
-          style={{ height: "calc(100vh - 150px)" }}
+          onScroll={onScroll}
+          className="flex flex-col overflow-y-auto p-4 flex-1"
+          style={{ height: "calc(100vh - 160px)" }}
         >
           <MessageList messages={activeConversation?.messages || []} />
+          {isLoading && (
+            <div className="text-center text-gray-500 italic mt-2">AI is typing...</div>
+          )}
         </div>
+
+        {/* Scroll to bottom button */}
+        {showScrollButton && (
+          <button
+            onClick={scrollToBottom}
+            className="absolute bottom-20 right-6 bg-blue-600 text-white rounded-full p-2 shadow-lg hover:bg-blue-700 transition"
+            aria-label="Scroll to bottom"
+          >
+            ↓
+          </button>
+        )}
+
         <MessageInput onSendMessage={handleSendMessage} isLoading={isLoading} />
       </div>
     </div>
@@ -139,4 +175,5 @@ const ChatWindow = () => {
 };
 
 export default ChatWindow;
+
 

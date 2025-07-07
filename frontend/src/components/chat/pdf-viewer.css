@@ -1,0 +1,49 @@
+/* PDF Viewer styles */
+.react-pdf__Document {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.react-pdf__Page {
+  margin-bottom: 1em;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.2);
+  background-color: white;
+}
+
+.react-pdf__Page__canvas {
+  max-width: 100%;
+  height: auto !important;
+  display: block;
+}
+
+/* Text layer styling */
+.react-pdf__Page__textContent {
+  z-index: 1;
+  cursor: text;
+  opacity: 0.2;
+  line-height: 1;
+  user-select: text;
+}
+
+/* Annotation layer styling */
+.react-pdf__Page__annotations.annotationLayer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+/* PDF highlight styles */
+.pdf-highlight {
+  background-color: rgba(255, 255, 0, 0.3);
+  border-radius: 2px;
+}
+
+/* Custom mark */
+mark {
+  background-color: rgba(255, 255, 0, 0.3) !important;
+  color: inherit !important;
+}

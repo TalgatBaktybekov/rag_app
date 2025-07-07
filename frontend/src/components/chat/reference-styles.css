@@ -1,0 +1,22 @@
+/* Reference styles */
+.reference-link {
+  color: var(--color-primary);
+  text-decoration: underline;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.reference-link:hover {
+  color: var(--color-primary-light);
+  text-decoration: underline;
+}
+
+.ai-message-content a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ai-message-content a:hover {
+  color: var(--color-primary-light);
+}

@@ -319,7 +319,7 @@ export default function DocumentUploadButton() {
                           </div>
                           {doc.document_id && (
                             <div className="text-xs text-[var(--color-text-muted)] mt-1">
-                              ID: {doc.document_id.substring(0, 8)}...
+                              ID: {doc.document_id.toString().substring(0, 8)}...
                             </div>
                           )}
                         </div>

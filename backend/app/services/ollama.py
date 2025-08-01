@@ -121,7 +121,7 @@ def build_langchain_agent(db, user_id, conv_id, question=None, needs_context=Tru
     ])
 
     # 4. Set up Ollama LLM
-    llm = Ollama(model="llama3")
+    llm = Ollama(model="deepseek-r1")
 
     # 5. Wrap with message history
     chain = RunnableWithMessageHistory(
@@ -158,7 +158,7 @@ def build_standardiser_chain():
             "Standalone question:"
         ),
     )
-    llm = Ollama(model="llama3")
+    llm = Ollama(model="deepseek-r1")
     return prompt | llm
 
 def build_context_need_evaluator():
@@ -195,5 +195,5 @@ def build_context_need_evaluator():
             "Answer:"
         )
     )
-    llm = Ollama(model="llama3")
+    llm = Ollama(model="deepseek-r1")
     return prompt | llm

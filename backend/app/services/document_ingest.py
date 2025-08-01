@@ -98,7 +98,7 @@ def load_documents_from_pdfs(file_paths=None):
     return docs
 
 # 2. Chunk and clean text
-def chunk_documents(docs, chunk_size=750, chunk_overlap=150):
+def chunk_documents(docs, chunk_size=500, chunk_overlap=150):
     """
     Split documents into chunks with improved parameters for better context retention
     
@@ -217,7 +217,7 @@ def ingest_user_document(db: Session, document_id: int):
         return False
 
 # 5. Retrieve relevant chunks for a query with document filtering
-def retrieve_relevant_chunks(query, k=6, user_id=None, document_ids=None, use_mmr=True, fetch_k=20, search_type="advanced_ensemble"):
+def retrieve_relevant_chunks(query, k=5, user_id=None, document_ids=None, use_mmr=True, fetch_k=20, search_type="advanced_ensemble"):
     """
     Retrieve relevant chunks based on query with intelligent search strategies
     
@@ -236,29 +236,23 @@ def retrieve_relevant_chunks(query, k=6, user_id=None, document_ids=None, use_mm
     embedding_fn = get_embedding_function()
     vectordb = Chroma(persist_directory=CHROMA_DIR, embedding_function=embedding_fn)
     
-    # Enhanced query for conclusion-type queries
-    enhanced_query = query
-    is_conclusion_query = any(pattern in query.lower() for pattern in 
-                             ['conclude', 'conclusion', 'summary', 'summarize', 'key finding', 'main point'])
-    if is_conclusion_query:
-        enhanced_query = f"{query} conclusion summary findings results"
     
     # Build metadata filter
     filter_dict = _build_metadata_filter(document_ids, user_id)
     
-    logger.info(f"Retrieving {k} chunks for query: '{query[:50]}...', search_type: {search_type}")
+    logger.info(f"Retrieving {k} chunks for query: '{query[:100]}...', search_type: {search_type}")
     
     try:
         # Execute search based on strategy
         if search_type == "advanced_ensemble":
-            results = _advanced_ensemble_search(vectordb, enhanced_query, k, fetch_k, filter_dict, is_conclusion_query)
+            results = _advanced_ensemble_search(vectordb, query, k, fetch_k, filter_dict)
         elif search_type == "ensemble":
-            results = _ensemble_search(vectordb, enhanced_query, k, fetch_k, filter_dict)
+            results = _ensemble_search(vectordb, query, k, fetch_k, filter_dict)
         elif search_type == "mmr" and use_mmr:
             results = vectordb.max_marginal_relevance_search(
-                enhanced_query, k=k, fetch_k=fetch_k, lambda_mult=0.8, filter=filter_dict)
+                query, k=k, fetch_k=fetch_k, lambda_mult=0.8, filter=filter_dict)
         else:
-            results = vectordb.similarity_search(enhanced_query, k=k, filter=filter_dict)
+            results = vectordb.similarity_search(query, k=k, filter=filter_dict)
         
         _log_search_results(results, logger)
         return results
@@ -278,7 +272,7 @@ def _build_metadata_filter(document_ids, user_id):
     return None
 
 
-def _advanced_ensemble_search(vectordb, query, k, fetch_k, filter_dict, is_conclusion_query):
+def _advanced_ensemble_search(vectordb, query, k, fetch_k, filter_dict):
     """Advanced ensemble search combining multiple strategies with intelligent ranking"""
     logger = logging.getLogger(__name__)
     
@@ -290,7 +284,7 @@ def _advanced_ensemble_search(vectordb, query, k, fetch_k, filter_dict, is_concl
     
 
     # Combine and deduplicate results with intelligent ranking
-    return _combine_and_rank_results([mmr_results, similarity_results], k, is_conclusion_query)
+    return _combine_and_rank_results([mmr_results, similarity_results], k)
 
 
 def _ensemble_search(vectordb, query, k, fetch_k, filter_dict):

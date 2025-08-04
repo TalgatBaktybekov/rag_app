@@ -98,7 +98,7 @@ def load_documents_from_pdfs(file_paths=None):
     return docs
 
 # 2. Chunk and clean text
-def chunk_documents(docs, chunk_size=500, chunk_overlap=150):
+def chunk_documents(docs, chunk_size=250, chunk_overlap=50):
     """
     Split documents into chunks with improved parameters for better context retention
     
@@ -113,14 +113,14 @@ def chunk_documents(docs, chunk_size=500, chunk_overlap=150):
         return []
     
     # Log document content for debugging
-    for i, doc in enumerate(docs):
-        content_length = len(doc.page_content) if doc.page_content else 0
-        logger.info(f"Document {i}: content length = {content_length} chars")
-        if content_length > 0:
-            preview = doc.page_content[:200].replace('\n', ' ')
-            logger.info(f"Document {i} preview: {preview}...")
-        else:
-            logger.warning(f"Document {i} has empty content!")
+    # for i, doc in enumerate(docs):
+    #     content_length = len(doc.page_content) if doc.page_content else 0
+    #     logger.info(f"Document {i}: content length = {content_length} chars")
+    #     if content_length > 0:
+    #         preview = doc.page_content[:200].replace('\n', ' ')
+    #         logger.info(f"Document {i} preview: {preview}...")
+    #     else:
+    #         logger.warning(f"Document {i} has empty content!")
     
     # Define splitter with carefully ordered separators
     splitter = RecursiveCharacterTextSplitter(
@@ -141,11 +141,11 @@ def chunk_documents(docs, chunk_size=500, chunk_overlap=150):
     logger.info(f"Split {len(docs)} documents into {len(chunks)} chunks with size={chunk_size}, overlap={chunk_overlap}")
     
     # Log chunk details
-    if chunks:
-        for i, chunk in enumerate(chunks[:3]):  # Log first 3 chunks
-            logger.info(f"Chunk {i}: length = {len(chunk.page_content)} chars, metadata = {chunk.metadata}")
-    else:
-        logger.warning("No chunks were created from the documents!")
+    # if chunks:
+    #     for i, chunk in enumerate(chunks[:3]):  # Log first 3 chunks
+    #         logger.info(f"Chunk {i}: length = {len(chunk.page_content)} chars, metadata = {chunk.metadata}")
+    # else:
+    #     logger.warning("No chunks were created from the documents!")
     
     return chunks
 
@@ -209,6 +209,13 @@ def ingest_user_document(db: Session, document_id: int):
         vectordb.add_documents(documents=chunks)
         vectordb.persist()
         
+        # Clear ChromaDB cache after operations
+        try:
+            import chromadb
+            chromadb.api.client.SharedSystemClient.clear_system_cache()
+        except Exception as e:
+            logger.warning(f"Could not clear ChromaDB cache: {e}")
+        
         # Update document status
         crud.update_document(db, document_id, ingested=True)
         return True
@@ -236,6 +243,12 @@ def retrieve_relevant_chunks(query, k=5, user_id=None, document_ids=None, use_mm
     embedding_fn = get_embedding_function()
     vectordb = Chroma(persist_directory=CHROMA_DIR, embedding_function=embedding_fn)
     
+    # Clear ChromaDB cache before operations
+    try:
+        import chromadb
+        chromadb.api.client.SharedSystemClient.clear_system_cache()
+    except Exception as e:
+        logger.warning(f"Could not clear ChromaDB cache: {e}")
     
     # Build metadata filter
     filter_dict = _build_metadata_filter(document_ids, user_id)
@@ -368,6 +381,13 @@ def delete_document_from_vectorstore(document_id):
         embedding_function=embedding_fn
     )
     
+    # Clear ChromaDB cache before operations
+    try:
+        import chromadb
+        chromadb.api.client.SharedSystemClient.clear_system_cache()
+    except Exception as e:
+        logger.warning(f"Could not clear ChromaDB cache: {e}")
+    
     try:
         # Try both integer and string formats for document_id
         filter_dict_int = {"document_id": {"$eq": int(document_id)}}
@@ -384,6 +404,14 @@ def delete_document_from_vectorstore(document_id):
         if matching_docs and matching_docs.get('ids'):
             vectordb.delete(matching_docs['ids'])
             vectordb.persist()
+            
+            # Clear ChromaDB cache after operations
+            try:
+                import chromadb
+                chromadb.api.client.SharedSystemClient.clear_system_cache()
+            except Exception as e:
+                logger.warning(f"Could not clear ChromaDB cache: {e}")
+                
             logger.info(f"Deleted {len(matching_docs['ids'])} chunks for document_id {document_id}")
             return True
         else:

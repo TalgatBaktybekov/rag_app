@@ -13,32 +13,58 @@ services:
       - pg_data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myuser -d rag_app"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   backend:
-    build: ./backend
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: rag-backend
+    restart: unless-stopped
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     env_file:
       - ./backend/.env
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
     ports:
       - "8000:8000"
     volumes:
-      - ./backend:/app
       - ./embeddings:/app/embeddings
       - ./data:/app/data
-    command: uvicorn backend.app.api.main:app --host 0.0.0.0 --port 8000 --reload
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   frontend:
-    build: ./frontend
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
     container_name: rag-frontend
+    restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - "5173:5173"
-    volumes:
-      - ./frontend:/app
-    command: npm run dev
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - DOCKER_ENV=true
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5173"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   pg_data:

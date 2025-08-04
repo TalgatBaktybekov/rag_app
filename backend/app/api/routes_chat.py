@@ -13,7 +13,7 @@ from ..core.security import get_current_user, TokenData
 from fastapi import BackgroundTasks
 from fastapi import status
 
-from ..services.ollama import build_standardiser_chain, build_langchain_agent, build_context_need_evaluator
+from ..services.ollama import build_standardiser_chain, build_langchain_agent
 
 logger = logging.getLogger(__name__)
 
@@ -211,26 +211,8 @@ async def ask(ai_req: AskRequest, db: Session = Depends(get_db), current_user: T
     if hasattr(standalone_question, "content"):
         standalone_question = standalone_question.content
     
-    # 3. Determine if the question needs context from documents
-    context_evaluator = build_context_need_evaluator()
-    context_need_response = context_evaluator.invoke({"question": standalone_question})
-    
-    # Extract the decision (0 or 1)
-    if hasattr(context_need_response, "content"):
-        context_decision = context_need_response.content.strip()
-    else:
-        context_decision = str(context_need_response).strip()
-    
-    # Parse the decision - be strict and default to False
-    needs_context = False
-    if context_decision == "1":
-        needs_context = True
-        logger.info(f"Question needs context: '{standalone_question}'")
-    else:
-        logger.info(f"Question does not need context: '{standalone_question}' (decision: {context_decision})")
-    
-    # 4. Use the standalone question for the main agent (with or without RAG)
-    chain, context_chunks = build_langchain_agent(db, current_user.user_id, ai_req.conv_id, question=standalone_question, needs_context=needs_context)
+    # 3. Use the standalone question for the main agent with RAG context
+    chain, context_chunks = build_langchain_agent(db, current_user.user_id, ai_req.conv_id, question=standalone_question, needs_context=True)
     config = {'configurable': {'session_id': str(ai_req.conv_id)}}
     response = chain.invoke({"question": standalone_question}, config=config)
     ai_content = response.content if hasattr(response, "content") else str(response)

@@ -4,8 +4,14 @@ from langchain_core.runnables.history import RunnableWithMessageHistory
 from ..db.crud import get_messages_by_conversation, get_document_selection_ids
 from ..services.document_ingest import retrieve_relevant_chunks
 import logging
+import os
 
 logger = logging.getLogger(__name__)
+
+def get_ollama_llm(model="gemma3"):
+    """Get Ollama LLM with proper base URL from environment"""
+    base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    return Ollama(model=model, base_url=base_url)
 
 class SimpleChatHistory:
     def __init__(self, messages):
@@ -121,7 +127,7 @@ def build_langchain_agent(db, user_id, conv_id, question=None, needs_context=Tru
     ])
 
     # 4. Set up Ollama LLM
-    llm = Ollama(model="deepseek-r1")
+    llm = get_ollama_llm("gemma3")
 
     # 5. Wrap with message history
     chain = RunnableWithMessageHistory(
@@ -158,42 +164,5 @@ def build_standardiser_chain():
             "Standalone question:"
         ),
     )
-    llm = Ollama(model="deepseek-r1")
-    return prompt | llm
-
-def build_context_need_evaluator():
-    """
-    Creates a chain that determines if a user question needs context from documents.
-    Returns a strict yes/no decision.
-    """
-    prompt = PromptTemplate(
-        input_variables=["question"],
-        template=(
-            "You must answer ONLY with '1' or '0'. No other text allowed.\n\n"
-            "Answer '1' if the question asks about:\n"
-            "- Specific data, facts, figures, results, or findings\n"
-            "- Specific projects, reports, studies, or research\n"
-            "- Analysis, summary, or extraction from content\n"
-            "- Specific content, policies, procedures, or technical details\n"
-            "- 'Results', 'findings', 'conclusions', 'outcomes', 'metrics', 'values'\n"
-            "- References 'the project', 'the study', 'the report', 'the document'\n\n"
-            "Answer '0' if the question is:\n"
-            "- General greeting or small talk\n"
-            "- General knowledge questions\n"
-            "- About AI capabilities\n"
-            "- General advice or explanations\n\n"
-            "Examples:\n"
-            "Question: What are the results of the project?\n"
-            "Answer: 1\n\n"
-            "Question: Can you give me the values of the evaluation metrics?\n"
-            "Answer: 1\n\n"
-            "Question: Hello, how are you?\n"
-            "Answer: 0\n\n"
-            "Question: What is machine learning?\n"
-            "Answer: 0\n\n"
-            "Question: {question}\n"
-            "Answer:"
-        )
-    )
-    llm = Ollama(model="deepseek-r1")
+    llm = get_ollama_llm("gemma3")
     return prompt | llm

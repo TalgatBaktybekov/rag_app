@@ -214,28 +214,6 @@ export const getPdfUrlForDocument = (filename) => {
   }
 };
 
-// Fetch a PDF with Authorization header and return as blob
-export async function fetchPdfWithAuth(pdfUrl) {
-  try {
-    const token = localStorage.getItem("token");
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
-    
-    const response = await fetch(pdfUrl, {
-      method: 'GET',
-      headers,
-      credentials: 'include'
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`);
-    }
-    
-    return await response.blob();
-  } catch (error) {
-    throw error;
-  }
-}
-
 // Logout function to clear token and redirect
 export const logoutUser = () => {
   localStorage.removeItem("token");

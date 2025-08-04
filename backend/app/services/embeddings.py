@@ -3,11 +3,20 @@
 # Here is a placeholder using OpenAIEmbeddings (replace with your preferred model)
 
 from langchain_community.embeddings import OllamaEmbeddings
+from ..core.logging_config import setup_logging
 
 def get_embedding_function():
-    # For Ollama local embeddings (make sure Ollama is running and supports embedding)
-    return OllamaEmbeddings(model="nomic-embed-text")
+    import os
+    base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
+# Setup logging configuration
+    logger = setup_logging()
+    logger.info(f"Using OllamaEmbeddings with base URL: {base_url}")
+
+    return OllamaEmbeddings(
+        model="mxbai-embed-large",  # Change this
+        base_url=base_url
+    )
 # If you want to use OpenAI:
 # from langchain_openai import OpenAIEmbeddings
 # def get_embedding_function():

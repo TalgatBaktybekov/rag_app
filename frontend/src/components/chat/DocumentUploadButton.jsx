@@ -1,6 +1,6 @@
 // DocumentUploadButton.jsx
-import React, { useState, useEffect } from 'react';
-import { uploadDocuments, ingestDocument, getDocumentStatus } from '../../services/api';
+import React, { useState } from 'react';
+import { uploadDocuments } from '../../services/api';
 
 export default function DocumentUploadButton() {
   const [isUploading, setIsUploading] = useState(false);
@@ -8,7 +8,6 @@ export default function DocumentUploadButton() {
   const [files, setFiles] = useState([]);
   const [uploadStatus, setUploadStatus] = useState('');
   const [uploadedDocs, setUploadedDocs] = useState([]);
-  const [pollingDocIds, setPollingDocIds] = useState([]);
 
   const handleFileChange = (e) => {
     const selectedFiles = Array.from(e.target.files);
@@ -45,58 +44,37 @@ export default function DocumentUploadButton() {
         formData.append('files', file);
       });
 
-      setUploadStatus('Uploading files...');
+      // Show initial processing state for all files
+      setUploadedDocs(files.map((file, index) => ({
+        document_id: `temp_${index}`,
+        filename: file.name,
+        display_name: file.name,
+        status: 'uploading',
+        processed: false
+      })));
 
-      // Upload files
+      setUploadStatus('Processing documents... This may take several minutes for large files.');
+
+      // Upload and process files synchronously (like chat messages)
       const result = await uploadDocuments(formData);
       
       if (!result.documents || result.documents.length === 0) {
         throw new Error('No documents were uploaded successfully');
       }
 
-      setUploadedDocs(result.documents.map(doc => ({ 
-        ...doc, 
-        ingestStarted: false, 
-        processed: false,
-        status: 'uploaded'
+      // Update with final results
+      setUploadedDocs(result.documents.map(doc => ({
+        ...doc,
+        status: doc.status || (doc.processed ? 'completed' : 'failed')
       })));
       
-      setUploadStatus('Files uploaded successfully. Starting processing...');
-
-      // Automatically start processing for all uploaded documents
-      const processingPromises = result.documents.map(async (doc) => {
-        try {
-          await ingestDocument(doc.document_id);
-          setUploadedDocs(docs => 
-            docs.map(d => 
-              d.document_id === doc.document_id 
-                ? { ...d, ingestStarted: true, status: 'processing' }
-                : d
-            )
-          );
-          return doc.document_id;
-        } catch (error) {
-          console.error(`Failed to start processing for document ${doc.document_id}:`, error);
-          setUploadedDocs(docs => 
-            docs.map(d => 
-              d.document_id === doc.document_id 
-                ? { ...d, ingestStarted: false, status: 'error' }
-                : d
-            )
-          );
-          return null;
-        }
-      });
-
-      // Add successfully started documents to polling
-      const startedDocIds = await Promise.all(processingPromises);
-      const validDocIds = startedDocIds.filter(id => id !== null);
+      const successCount = result.documents.filter(doc => doc.processed).length;
+      const failCount = result.documents.length - successCount;
       
-      if (validDocIds.length > 0) {
-        setPollingDocIds(validDocIds);
-        setUploadStatus(`Processing ${validDocIds.length} document(s). This may take several minutes for large files.`);
+      if (failCount > 0) {
+        setUploadStatus(`Processed ${successCount} documents successfully, ${failCount} failed.`);
       } else {
-        setUploadStatus('Upload completed but processing failed to start. Please try again.');
+        setUploadStatus(`All ${successCount} documents processed successfully!`);
       }
       
       // Clear file input
@@ -105,83 +83,12 @@ export default function DocumentUploadButton() {
     } catch (error) {
       console.error('Upload error:', error);
       setUploadStatus(`Upload failed: ${error.response?.data?.detail || error.message}`);
+      // Update all documents to error state
+      setUploadedDocs(prev => prev.map(doc => ({ ...doc, status: 'error', processed: false })));
     } finally {
       setIsUploading(false);
     }
   };
-
-  // Poll for document status updates with better error handling and timing
-  useEffect(() => {
-    if (pollingDocIds.length === 0) return;
-    
-    let pollCount = 0;
-    const maxPollAttempts = 100; // 5 minutes max (100 * 3 seconds)
-    
-    // Set up interval to poll for document status
-    const intervalId = setInterval(async () => {
-      pollCount++;
-      
-      try {
-        // Check status for each document in polling state
-        const updatedStatuses = await Promise.all(
-          pollingDocIds.map(async docId => {
-            try {
-              const status = await getDocumentStatus(docId);
-              return { 
-                docId, 
-                processed: status.ingested,
-                error: false,
-                status: status.status || 'processing'
-              };
-            } catch (error) {
-              console.error(`Error checking status for document ${docId}:`, error);
-              return { 
-                docId, 
-                processed: false, 
-                error: true,
-                status: 'error'
-              };
-            }
-          })
-        );
-        
-        // Update document statuses
-        let stillPolling = false;
-        setUploadedDocs(docs => 
-          docs.map(doc => {
-            const statusUpdate = updatedStatuses.find(s => s.docId === doc.document_id);
-            if (statusUpdate) {
-              if (statusUpdate.processed) {
-                return { ...doc, ingestStarted: true, processed: true, status: 'completed' };
-              } else if (statusUpdate.error) {
-                return { ...doc, ingestStarted: true, processed: false, status: 'error' };
-              } else {
-                stillPolling = true;
-                return { ...doc, ingestStarted: true, status: statusUpdate.status || 'processing' };
-              }
-            }
-            return doc;
-          })
-        );
-        
-        // Stop polling if all documents are processed/errored or max attempts reached
-        if (!stillPolling || pollCount >= maxPollAttempts) {
-          setPollingDocIds([]);
-          if (pollCount >= maxPollAttempts) {
-            console.warn('Document processing polling timed out after 5 minutes');
-            setUploadStatus('Some documents may still be processing. Please refresh to check status.');
-          }
-        }
-        
-      } catch (error) {
-        console.error('Error during polling:', error);
-        // Continue polling unless it's a critical error
-      }
-    }, 2000); // Check every 2 seconds for better responsiveness
-    
-    // Cleanup interval on unmount
-    return () => clearInterval(intervalId);
-  }, [pollingDocIds]);
   
   const removeFile = (index) => {
     setFiles(files.filter((_, i) => i !== index));
@@ -192,7 +99,6 @@ export default function DocumentUploadButton() {
     setShowModal(false);
     setUploadStatus('');
     setUploadedDocs([]);
-    setPollingDocIds([]);
   };
 
   return (
@@ -279,62 +185,6 @@ export default function DocumentUploadButton() {
                     : 'bg-green-900/20 text-green-400 border border-green-400/30'
                 }`}>
                   {uploadStatus}
-                </div>
-              )}
-
-              {uploadedDocs.length > 0 && (
-                <div className="mt-4">
-                  <h3 className="text-sm font-medium text-[var(--color-text-main)] mb-2">
-                    Document Processing Status:
-                  </h3>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {uploadedDocs.map((doc) => (
-                      <div key={doc.document_id} className="flex items-center bg-[var(--color-bg-accent)] p-3 rounded-lg border border-white/10">
-                        <div className="flex-1 min-w-0">
-                          <span className="text-sm text-[var(--color-text-main)] truncate block font-medium">
-                            {doc.display_name}
-                          </span>
-                          <div className="text-xs mt-1 flex items-center gap-2">
-                            {doc.status === 'completed' || doc.processed ? (
-                              <span className="text-green-400 flex items-center gap-1">
-                                <span className="w-2 h-2 bg-green-400 rounded-full"></span>
-                                Successfully Processed
-                              </span>
-                            ) : doc.status === 'error' ? (
-                              <span className="text-red-400 flex items-center gap-1">
-                                <span className="w-2 h-2 bg-red-400 rounded-full"></span>
-                                Processing Failed
-                              </span>
-                            ) : doc.ingestStarted ? (
-                              <span className="text-yellow-400 flex items-center gap-1">
-                                <span className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></span>
-                                Processing... (this may take a few minutes for large files)
-                              </span>
-                            ) : (
-                              <span className="text-gray-400 flex items-center gap-1">
-                                <span className="w-2 h-2 bg-gray-400 rounded-full"></span>
-                                Waiting to start
-                              </span>
-                            )}
-                          </div>
-                          {doc.document_id && (
-                            <div className="text-xs text-[var(--color-text-muted)] mt-1">
-                              ID: {doc.document_id.toString().substring(0, 8)}...
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {pollingDocIds.length > 0 && (
-                    <div className="mt-3 p-2 bg-blue-900/20 border border-blue-400/30 rounded-md">
-                      <div className="text-xs text-blue-300 flex items-center gap-2">
-                        <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
-                        Checking processing status... Large documents may take several minutes.
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
 

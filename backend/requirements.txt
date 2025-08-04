@@ -31,7 +31,11 @@ python-multipart==0.0.9
 # Add missing dependencies for RAG
 langchain-text-splitters==0.0.1
 pypdf2==3.0.1
-sentence-transformers==2.2.2
+sentence-transformers==2.7.0
+
+# HuggingFace transformers and torch for embeddings
+transformers==4.38.2
+# torch==2.2.1  # Installed separately in Dockerfile with CPU-only version
 
 # Add for better error handling and validation
 pydantic[email]==2.7.1

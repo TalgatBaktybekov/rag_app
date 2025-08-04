@@ -108,11 +108,10 @@ async def trigger_document_ingestion(
 @router.post("/upload")
 async def upload_user_documents(
     files: List[UploadFile] = File(...),
-    background_tasks: BackgroundTasks = None,
     db: Session = Depends(get_db),
     current_user: TokenData = Depends(get_current_user)
 ):
-    """Upload new PDF documents to your knowledge base"""
+    """Upload and immediately process PDF documents to your knowledge base"""
     uploaded_documents = []
     
     if len(files) > 10:  # Limit number of files
@@ -141,16 +140,30 @@ async def upload_user_documents(
                 file_path=file_path
             )
             
-            # Ingest document in background if provided
-            if background_tasks:
-                background_tasks.add_task(ingest_user_document, db, doc.document_id)
+            # Process document immediately (synchronously)
+            logger.info(f"Starting synchronous ingestion for document {doc.document_id}: {file.filename}")
+            ingestion_success = ingest_user_document(db, doc.document_id)
             
-            # Add to response
-            uploaded_documents.append({
-                "document_id": doc.document_id,
-                "filename": doc.filename,
-                "display_name": doc.display_name
-            })
+            if not ingestion_success:
+                logger.error(f"Failed to ingest document {doc.document_id}: {file.filename}")
+                # Still add to response but mark as failed
+                uploaded_documents.append({
+                    "document_id": doc.document_id,
+                    "filename": doc.filename,
+                    "display_name": doc.display_name,
+                    "status": "ingestion_failed",
+                    "processed": False
+                })
+            else:
+                logger.info(f"Successfully ingested document {doc.document_id}: {file.filename}")
+                # Add to response with success status
+                uploaded_documents.append({
+                    "document_id": doc.document_id,
+                    "filename": doc.filename,
+                    "display_name": doc.display_name,
+                    "status": "completed",
+                    "processed": True
+                })
             
             logger.info(f"Successfully uploaded file: {secure_filename}")
         except Exception as e:
@@ -158,7 +171,7 @@ async def upload_user_documents(
             raise HTTPException(status_code=500, detail=f"Failed to save file: {file.filename}")
     
     return {
-        "message": f"Uploaded {len(uploaded_documents)} files",
+        "message": f"Uploaded and processed {len(uploaded_documents)} files",
         "documents": uploaded_documents
     }
 

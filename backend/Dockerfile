@@ -10,13 +10,16 @@ RUN apt-get update && apt-get install -y \
     g++ \
     libpq-dev \
     curl \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
 COPY requirements.txt .
 
 # Install Python dependencies
+# Install torch first with CPU-only version for smaller image size
 RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir torch==2.2.1 --index-url https://download.pytorch.org/whl/cpu && \
     pip install --no-cache-dir -r requirements.txt
 
 # Copy the application code

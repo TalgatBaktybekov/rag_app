@@ -42,7 +42,7 @@ def build_langchain_agent(db, user_id, conv_id, question=None, needs_context=Tru
             logger.info(f"Retrieving chunks for {len(selected_doc_ids)} selected documents")
             context_chunks = retrieve_relevant_chunks(
                 query=question, 
-                k=8,  # Increased from 6 to get more context
+                k=5,  # Increased from 6 to get more context
                 document_ids=selected_doc_ids,
                 use_mmr=True,  # Use Maximal Marginal Relevance for better diversity
                 fetch_k=25,    # Get 25 initial candidates before selecting diverse subset
@@ -103,11 +103,11 @@ def build_langchain_agent(db, user_id, conv_id, question=None, needs_context=Tru
             "- You are a highly professional, concise, and helpful AI assistant.\n"
             "- If the provided context contains the information needed to answer the question, use it to give a precise and accurate response with proper references.\n"
             "- Pay special attention to context marked with [Reference X - Document: ...] as these are from relevant sources.\n"
-            "- When asked about conclusions, summaries, or key findings, prioritize content that contains that specific information.\n"
             "- Answer in a way that is faithful to the provided context and does not introduce speculation.\n"
             "- When multiple pieces of context contain relevant information, synthesize them into a coherent answer.\n"
             "- If the provided context doesn't contain enough information to fully answer the question, you may draw on your general knowledge to supplement, but clearly distinguish between what comes from the context (with references) and what is general knowledge (without references).\n"
             "- If you do not know the answer based on your knowledge and the context, simply state that you do not know.\n"
+            "- For better your understanding of the dialogue, the chat history would be attached in the end.\n"
             "- Avoid phrases like 'based on the context' or 'according to the documents provided'.\n\n"
 
             "Context:\n" + context_with_refs
